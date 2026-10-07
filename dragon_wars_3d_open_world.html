@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dragon Wars 3D — Open World RPG</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js 3D Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #050811;
+            color: #e2e8f0;
+        }
+
+        .font-cinzel { font-family: 'Cinzel', serif; }
+
+        canvas#webgl-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        /* Glassmorphism containers */
+        .hud-glass {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .hud-glass-gold {
+            background: rgba(20, 15, 5, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.4); border-radius: 3px; }
+
+        /* Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Damage text float animation */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+        }
+        .damage-popup {
+            position: absolute;
+            font-family: 'Cinzel', serif;
+            font-weight: 900;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 30;
+            text-shadow: 0 0 8px rgba(0,0,0,0.9);
+        }
+
+        /* Rep Progress Bars */
+        .rep-bar-fill {
+            transition: width 0.4s ease-in-out, background-color 0.4s;
+        }
+
+        .no-select {
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="no-select">
+
+    <!-- 3D Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Crosshair -->
+    <div id="crosshair" class="hidden">
+        <div class="w-3 h-3 border-2 border-amber-400/80 rounded-full flex items-center justify-center">
+            <div class="w-1 h-1 bg-amber-400 rounded-full"></div>
+        </div>
+    </div>
+
+    
+    <!-- CHARACTER SELECTION & LORE SCREEN -->
+    <div id="charSelectModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-4 sm:p-6 overflow-y-auto">
+        <div class="max-w-4xl w-full hud-glass-gold rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative border border-amber-500/40">
+            
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-widest">
+                    <i class="fa-solid fa-dragon"></i> 3D Open World Fantasy RPG
+                </div>
+                <h1 class="font-cinzel text-3xl sm:text-5xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 drop-shadow-md">
+                    DRAGON WARS
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto leading-relaxed">
+                    For 100 years, the mighty <strong class="text-amber-400">Dragon King</strong> guarded the border between the Human Realm and the Magic Realm. Last week, he was assassinated by a dark human mage. War has erupted!
+                </p>
+                <p class="text-xs text-amber-300/90 italic bg-amber-950/40 py-1.5 px-4 rounded-xl border border-amber-500/20 max-w-xl mx-auto">
+                    ⚠️ You spawn as an exiled outcast with <strong class="text-red-400">-100 Hostile Reputation</strong> with BOTH sides. Everyone attacks on sight until you earn trust through quests!
+                </p>
+            </div>
+
+            <!-- Class Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                
+                <!-- Class 1: Dragon Knight -->
+                <div id="class-knight" onclick="selectClass('knight')" class="class-card bg-slate-900/80 border-2 border-amber-500/80 rounded-2xl p-5 cursor-pointer hover:scale-105 hover:border-amber-400 transition-all group flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-cinzel font-bold text-lg text-amber-300">Dragon Knight</h3>
+                            <p class="text-xs text-slate-400 mt-1">Melee tank equipped with heavy blade armor and shield bash power.</p>
+                        </div>
+                        <div class="space-y-1.5 text-xs text-slate-300 pt-2 font-semibold">
+                            <div class="flex justify-between"><span>Health:</span> <span class="text-emerald-400">150 HP</span></div>
+                            <div class="flex justify-between"><span>Mana:</span> <span class="text-cyan-400">50 MP</span></div>
+                            <div class="flex justify-between"><span>Damage:</span> <span class="text-amber-400">25 Melee</span></div>
+                            <div class="flex justify-between"><span>Speed:</span> <span class="text-slate-400">Normal</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-center">
+                        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider group-hover:underline">Select Class</span>
+                    </div>
+                </div>
+
+                <!-- Class 2: Arcane Spellblade -->
+                <div id="class-spellblade" onclick="selectClass('spellblade')" class="class-card bg-slate-900/60 border-2 border-slate-800 rounded-2xl p-5 cursor-pointer hover:scale-105 hover:border-cyan-400 transition-all group flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-cinzel font-bold text-lg text-cyan-300">Arcane Spellblade</h3>
+                            <p class="text-xs text-slate-400 mt-1">Master of magic energy bolts and elemental shield abilities.</p>
+                        </div>
+                        <div class="space-y-1.5 text-xs text-slate-300 pt-2 font-semibold">
+                            <div class="flex justify-between"><span>Health:</span> <span class="text-emerald-400">100 HP</span></div>
+                            <div class="flex justify-between"><span>Mana:</span> <span class="text-cyan-400">140 MP</span></div>
+                            <div class="flex justify-between"><span>Damage:</span> <span class="text-cyan-400">40 Magic</span></div>
+                            <div class="flex justify-between"><span>Speed:</span> <span class="text-slate-400">Fast</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-center">
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider group-hover:underline">Select Class</span>
+                    </div>
+                </div>
+
+                <!-- Class 3: Shadow Rogue -->
+                <div id="class-rogue" onclick="selectClass('rogue')" class="class-card bg-slate-900/60 border-2 border-slate-800 rounded-2xl p-5 cursor-pointer hover:scale-105 hover:border-purple-400 transition-all group flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-person-running"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-cinzel font-bold text-lg text-purple-300">Shadow Rogue</h3>
+                            <p class="text-xs text-slate-400 mt-1">High movement speed, critical strikes, and fast energy regen.</p>
+                        </div>
+                        <div class="space-y-1.5 text-xs text-slate-300 pt-2 font-semibold">
+                            <div class="flex justify-between"><span>Health:</span> <span class="text-emerald-400">110 HP</span></div>
+                            <div class="flex justify-between"><span>Mana:</span> <span class="text-cyan-400">80 MP</span></div>
+                            <div class="flex justify-between"><span>Damage:</span> <span class="text-purple-400">35 Crit</span></div>
+                            <div class="flex justify-between"><span>Speed:</span> <span class="text-emerald-400">Very Fast</span></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-center">
+                        <span class="text-xs font-bold text-purple-400 uppercase tracking-wider group-hover:underline">Select Class</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Start Game Button -->
+            <div class="text-center pt-2">
+                <button onclick="startGame()" class="px-10 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-cinzel font-black text-lg tracking-widest uppercase shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all">
+                    ENTER THE REALM <i class="fa-solid fa-play ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- MAIN IN-GAME HUD -->
+    <div id="gameHUD" class="fixed inset-0 pointer-events-none hidden z-10 flex flex-col justify-between p-4 sm:p-6">
+        
+        <!-- Top HUD Bar -->
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            
+            <!-- Player Stats (Health, Mana, Level, Gold) -->
+            <div class="hud-glass rounded-2xl p-4 w-72 space-y-2 pointer-events-auto shadow-xl">
+                <div class="flex items-center justify-between">
+                    <span id="hudClassName" class="font-cinzel font-extrabold text-amber-400 text-sm">Dragon Knight</span>
+                    <span id="hudLevel" class="text-xs font-extrabold bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2.5 py-0.5 rounded-full">Lvl 1</span>
+                </div>
+
+                <!-- Health Bar -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold">
+                        <span class="text-slate-300"><i class="fa-solid fa-heart text-red-500 mr-1"></i> Health</span>
+                        <span id="hudHPText" class="text-red-400">150 / 150</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700">
+                        <div id="hudHPFill" class="bg-gradient-to-r from-red-600 to-red-500 h-full w-full transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <!-- Mana Bar -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold">
+                        <span class="text-slate-300"><i class="fa-solid fa-bolt text-cyan-400 mr-1"></i> Mana</span>
+                        <span id="hudMPText" class="text-cyan-400">50 / 50</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                        <div id="hudMPFill" class="bg-gradient-to-r from-cyan-600 to-cyan-400 h-full w-full transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <!-- Gold & Exp -->
+                <div class="flex justify-between items-center text-xs font-bold pt-1 text-slate-300">
+                    <span class="text-amber-400 flex items-center"><i class="fa-solid fa-coins mr-1.5"></i> <span id="hudGold">0 Gold</span></span>
+                    <span class="text-purple-400 flex items-center"><i class="fa-solid fa-star mr-1"></i> <span id="hudEXP">0 / 100 XP</span></span>
+                </div>
+            </div>
+
+            <!-- Faction Alliance Reputation Meters -->
+            <div class="hud-glass rounded-2xl p-4 w-80 space-y-3 pointer-events-auto shadow-xl">
+                <div class="text-xs font-cinzel font-bold text-slate-300 border-b border-slate-800 pb-1.5 flex justify-between items-center">
+                    <span><i class="fa-solid fa-shield-halved text-amber-400 mr-1"></i> WAR ALLIANCES</span>
+                    <span class="text-[10px] text-slate-400 font-sans">Press TAB for Log</span>
+                </div>
+
+                <!-- Human Faction Reputation -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold">
+                        <span class="text-amber-400 flex items-center"><i class="fa-solid fa-crown mr-1"></i> Human Realm</span>
+                        <span id="repHumanStatus" class="text-red-400 font-black">HOSTILE (-100)</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                        <div id="repHumanFill" class="bg-red-500 h-full transition-all duration-500" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Magic Faction Reputation -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] font-bold">
+                        <span class="text-cyan-400 flex items-center"><i class="fa-solid fa-hat-wizard mr-1"></i> Magic Realm</span>
+                        <span id="repMagicStatus" class="text-red-400 font-black">HOSTILE (-100)</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                        <div id="repMagicFill" class="bg-red-500 h-full transition-all duration-500" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Minimap Radar -->
+            <div class="hud-glass rounded-2xl p-2 w-32 h-32 relative pointer-events-auto shadow-xl flex items-center justify-center overflow-hidden border border-slate-700">
+                <canvas id="minimapCanvas" width="120" height="120" class="rounded-xl"></canvas>
+                <div class="absolute top-1 left-2 text-[9px] font-bold text-amber-400/80">RADAR</div>
+            </div>
+
+        </div>
+
+        <!-- Center Notification Toast -->
+        <div id="notificationToast" class="self-center bg-slate-900/90 border border-amber-500/50 text-amber-300 font-cinzel font-bold text-sm px-6 py-2.5 rounded-full shadow-2xl opacity-0 transition-opacity duration-300 transform translate-y-2 pointer-events-none">
+            Quest Updated!
+        </div>
+
+        <!-- Bottom Action Bar & Controls Prompt -->
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            
+            <!-- Controls Guide -->
+            <div class="hud-glass rounded-xl p-3 text-[11px] font-medium text-slate-300 space-y-1 pointer-events-auto hidden sm:block">
+                <div><span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 font-bold border border-slate-700">WASD</span> Move</div>
+                <div><span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 font-bold border border-slate-700">L-Click</span> Attack &nbsp; | &nbsp; <span class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 font-bold border border-slate-700">R-Click / Q</span> Spell</div>
+                <div><span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 font-bold border border-slate-700">E</span> Interact / Harvest &nbsp; | &nbsp; <span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 font-bold border border-slate-700">I</span> Inventory</div>
+                <div><span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 font-bold border border-slate-700">TAB</span> Quest & Factions Log</div>
+            </div>
+
+            <!-- Quick Action Hotbar -->
+            <div class="flex items-center space-x-2 pointer-events-auto mx-auto sm:mx-0">
+                <button onclick="usePotion('hp')" title="Heal HP (1)" class="w-12 h-12 rounded-xl hud-glass hover:border-red-500 text-red-400 flex flex-col items-center justify-center font-bold text-xs relative transition-all active:scale-95">
+                    <i class="fa-solid fa-flask text-base"></i>
+                    <span id="hpPotionCount" class="text-[10px] text-white">0</span>
+                    <span class="absolute top-0.5 right-1 text-[9px] text-slate-400">1</span>
+                </button>
+                <button onclick="usePotion('mp')" title="Restore Mana (2)" class="w-12 h-12 rounded-xl hud-glass hover:border-cyan-500 text-cyan-400 flex flex-col items-center justify-center font-bold text-xs relative transition-all active:scale-95">
+                    <i class="fa-solid fa-flask text-base"></i>
+                    <span id="mpPotionCount" class="text-[10px] text-white">0</span>
+                    <span class="absolute top-0.5 right-1 text-[9px] text-slate-400">2</span>
+                </button>
+                <button onclick="toggleInventoryModal()" class="w-12 h-12 rounded-xl hud-glass hover:border-amber-500 text-amber-400 flex flex-col items-center justify-center font-bold text-xs transition-all active:scale-95">
+                    <i class="fa-solid fa-briefcase text-base"></i>
+                    <span class="text-[9px] text-slate-300">Bag (I)</span>
+                </button>
+                <button onclick="toggleQuestModal()" class="w-12 h-12 rounded-xl hud-glass hover:border-amber-500 text-amber-400 flex flex-col items-center justify-center font-bold text-xs transition-all active:scale-95">
+                    <i class="fa-solid fa-scroll text-base"></i>
+                    <span class="text-[9px] text-slate-300">Log (TAB)</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- INVENTORY MODAL -->
+    <div id="inventoryModal" class="fixed inset-0 z-40 hidden flex items-center justify-center bg-slate-950/80 p-4">
+        <div class="max-w-lg w-full hud-glass-gold rounded-3xl p-6 space-y-4 shadow-2xl border border-amber-500/40">
+            <div class="flex justify-between items-center border-b border-amber-500/30 pb-3">
+                <h3 class="font-cinzel font-extrabold text-lg text-amber-400 flex items-center">
+                    <i class="fa-solid fa-briefcase mr-2"></i> Inventory & Resources
+                </h3>
+                <button onclick="toggleInventoryModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div id="inventoryGrid" class="grid grid-cols-4 gap-3 max-h-72 overflow-y-auto p-1">
+                <!-- Dynamic Item Slots -->
+            </div>
+
+            <div class="text-xs text-slate-400 text-center pt-2">
+                Click consumable items to use them in combat.
+            </div>
+        </div>
+    </div>
+
+    <!-- QUEST & FACTION LOG MODAL -->
+    <div id="questModal" class="fixed inset-0 z-40 hidden flex items-center justify-center bg-slate-950/80 p-4">
+        <div class="max-w-2xl w-full hud-glass-gold rounded-3xl p-6 space-y-5 shadow-2xl border border-amber-500/40">
+            <div class="flex justify-between items-center border-b border-amber-500/30 pb-3">
+                <h3 class="font-cinzel font-extrabold text-xl text-amber-400 flex items-center">
+                    <i class="fa-solid fa-scroll mr-2"></i> War Quest Log & Faction Standings
+                </h3>
+                <button onclick="toggleQuestModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Faction Standings Overview -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900/80 rounded-2xl p-4 border border-amber-500/30 space-y-2">
+                    <div class="flex items-center space-x-2 text-amber-400 font-cinzel font-bold text-sm">
+                        <i class="fa-solid fa-crown"></i> <span>Human Realm</span>
+                    </div>
+                    <p class="text-xs text-slate-300">Leader: High King Aurelius</p>
+                    <div id="modalHumanRep" class="text-xs font-bold text-red-400">Reputation: -100 (Hostile)</div>
+                    <p class="text-[11px] text-slate-400">Do quests for Human Captains to gain favor. Attacks on sight when hostile.</p>
+                </div>
+
+                <div class="bg-slate-900/80 rounded-2xl p-4 border border-cyan-500/30 space-y-2">
+                    <div class="flex items-center space-x-2 text-cyan-400 font-cinzel font-bold text-sm">
+                        <i class="fa-solid fa-hat-wizard"></i> <span>Magic Realm</span>
+                    </div>
+                    <p class="text-xs text-slate-300">Leader: Arch-Mage Elion</p>
+                    <div id="modalMagicRep" class="text-xs font-bold text-red-400">Reputation: -100 (Hostile)</div>
+                    <p class="text-[11px] text-slate-400">Do quests for Arcane Keepers to gain favor. Attacks on sight when hostile.</p>
+                </div>
+            </div>
+
+            <!-- Active Quests List -->
+            <div class="space-y-2">
+                <h4 class="font-cinzel font-bold text-sm text-slate-200">Active War Quests</h4>
+                <div id="questList" class="space-y-2 max-h-48 overflow-y-auto">
+                    <!-- Dynamic Quests -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NPC INTERACTION DIALOGUE MODAL -->
+    <div id="dialogueModal" class="fixed inset-x-4 bottom-6 z-40 hidden flex justify-center">
+        <div class="max-w-2xl w-full hud-glass-gold rounded-3xl p-6 space-y-4 shadow-2xl border border-amber-500/50">
+            <div class="flex items-center space-x-3">
+                <div id="npcAvatar" class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-bold">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                    <h3 id="npcName" class="font-cinzel font-extrabold text-amber-300 text-base">Human Captain</h3>
+                    <span id="npcFactionTag" class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Human Realm Officer</span>
+                </div>
+            </div>
+
+            <p id="npcDialogueText" class="text-xs sm:text-sm text-slate-200 leading-relaxed bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                "State your business, outcast! The Dragon King is dead, and we intend to purge all magic wielders from these lands."
+            </p>
+
+            <div id="dialogueOptions" class="flex flex-wrap gap-2 pt-1">
+                <!-- Action Buttons -->
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / VICTORY MODAL -->
+    <div id="gameOverModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-950/95 p-6">
+        <div class="max-w-md w-full hud-glass-gold rounded-3xl p-8 text-center space-y-6 shadow-2xl border-2 border-amber-500/60">
+            <div class="w-20 h-20 mx-auto rounded-full bg-amber-500/20 border-2 border-amber-500/60 flex items-center justify-center text-amber-400 text-4xl">
+                <i class="fa-solid fa-trophy" id="endGameIcon"></i>
+            </div>
+            <div class="space-y-2">
+                <h2 id="endGameTitle" class="font-cinzel text-3xl font-black text-amber-400 tracking-wider">WAR ENDED</h2>
+                <p id="endGameDesc" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    A ruler has fallen and the balance of power has shifted forever.
+                </p>
+            </div>
+            <button onclick="location.reload()" class="px-8 py-3 rounded-2xl bg-amber-500 text-slate-950 font-cinzel font-bold text-sm uppercase tracking-widest hover:scale-105 transition-all">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        /* ==========================================================================
+           1. AUDIO SYNTHESIZER (WEB AUDIO API)
+           ========================================================================== */
+        const SoundEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playBeep(freq = 440, type = 'sine', duration = 0.1, gainVal = 0.1) {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e){}
+            },
+            playSwordSwing() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e){}
+            },
+            playSpellCast() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.25);
+                } catch(e){}
+            },
+            playExplosion() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.4);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.4);
+                } catch(e){}
+            },
+            playHorn() {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.setValueAtTime(220, this.ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 1.2);
+                } catch(e){}
+            }
+        };
+
+        /* ==========================================================================
+           2. GAME STATE & CHARACTER CONFIG
+           ========================================================================== */
+        const gameState = {
+            selectedClass: 'knight',
+            level: 1,
+            exp: 0,
+            maxExp: 100,
+            hp: 150,
+            maxHp: 150,
+            mp: 50,
+            maxMp: 50,
+            gold: 0,
+            speed: 0.18,
+            attackPower: 25,
+            
+            // Faction Reputations (-100 to +100)
+            repHuman: -100,
+            repMagic: -100,
+
+            // Inventory
+            inventory: {
+                hpPotion: 3,
+                mpPotion: 2,
+                ironIngot: 0,
+                manaCrystal: 0,
+                dragonScale: 0
+            },
+
+            // Active Quests
+            quests: [
+                {
+                    id: 'human_quest_1',
+                    faction: 'human',
+                    title: 'Human Border Trust',
+                    desc: 'Defeat 3 Rogue Bandits in the central ruins to prove your strength to Human Captains.',
+                    targetCount: 3,
+                    currentCount: 0,
+                    completed: false,
+                    rewardRep: 25,
+                    rewardGold: 100
+                },
+                {
+                    id: 'magic_quest_1',
+                    faction: 'magic',
+                    title: 'Arcane Energy Gathering',
+                    desc: 'Harvest 3 Glowing Mana Crystals in the Arcane forest to earn Magic Keeper trust.',
+                    targetCount: 3,
+                    currentCount: 0,
+                    completed: false,
+                    rewardRep: 25,
+                    rewardGold: 100
+                }
+            ],
+
+            gameEnded: false
+        };
+
+        /* ==========================================================================
+           3. THREE.JS 3D SCENE & WORLD GENERATION
+           ========================================================================== */
+        let scene, camera, renderer;
+        let playerGroup, playerMesh, playerWeapon;
+        let keys = {};
+        let mouseX = 0, mouseY = 0;
+        let isPointerLocked = false;
+
+        // Entities arrays
+        const npcs = [];
+        const enemies = [];
+        const resourceNodes = [];
+        const projectiles = [];
+
+        function init3DWorld() {
+            const canvas = document.getElementById('webgl-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0f1d);
+            scene.fog = new THREE.FogExp2(0x0a0f1d, 0.008);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Ambient & Directional Lights (Sun/Moon lighting)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff5ea, 0.9);
+            sunLight.position.set(100, 150, 50);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 300;
+            const d = 100;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            // Terrain Generation
+            createTerrain();
+
+            // World Landmarks & Outposts
+            createHumanFortress();
+            createMagicTower();
+            createDragonKingShrine();
+
+            // Populate World Entities
+            spawnWorldEntities();
+
+            // Create Player Mesh
+            createPlayerMesh();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            setupInputControls();
+        }
+
+        // --- STREAMING_CHUNK:Building procedural 3D terrain and landmarks... ---
+
+        function createTerrain() {
+            const size = 300;
+            const geometry = new THREE.PlaneGeometry(size, size, 64, 64);
+            geometry.rotateX(-Math.PI / 2);
+
+            // Apply height variations for terrain
+            const pos = geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const distCenter = Math.sqrt(x*x + z*z);
+                const height = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 3 + Math.sin(x * 0.02) * 4;
+                pos.setY(i, height);
+            }
+            geometry.computeVertexNormals();
+
+            const terrainMat = new THREE.MeshStandardMaterial({
+                color: 0x1b281b,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+
+            const terrain = new THREE.Mesh(geometry, terrainMat);
+            terrain.receiveShadow = true;
+            scene.add(terrain);
+
+            // River mesh down the middle border
+            const riverGeo = new THREE.PlaneGeometry(20, size);
+            riverGeo.rotateX(-Math.PI / 2);
+            const riverMat = new THREE.MeshStandardMaterial({
+                color: 0x0077be,
+                roughness: 0.1,
+                metalness: 0.8,
+                transparent: true,
+                opacity: 0.8
+            });
+            const river = new THREE.Mesh(riverGeo, riverMat);
+            river.position.set(0, 0.2, 0);
+            scene.add(river);
+
+            // Scattered Trees & Vegetation
+            for (let i = 0; i < 70; i++) {
+                const tx = (Math.random() - 0.5) * 260;
+                const tz = (Math.random() - 0.5) * 260;
+                if (Math.abs(tx) > 15) createTree(tx, tz);
+            }
+        }
+
+        function createTree(x, z) {
+            const group = new THREE.Group();
+            const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 4, 6);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2314 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 2;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            const foliageGeo = new THREE.ConeGeometry(2.5, 6, 6);
+            const foliageMat = new THREE.MeshStandardMaterial({ color: 0x0f3812, roughness: 0.8 });
+            const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+            foliage.position.y = 5;
+            foliage.castShadow = true;
+            group.add(foliage);
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+        }
+
+        function createHumanFortress() {
+            // Human Fortress at +X side (X: +90, Z: 0)
+            const group = new THREE.Group();
+            
+            // Wall Keep
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7 });
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(30, 10, 30), wallMat);
+            wall.position.y = 5;
+            wall.castShadow = true;
+            group.add(wall);
+
+            // Flags
+            const flagMat = new THREE.MeshStandardMaterial({ color: 0xeab308 });
+            const flag = new THREE.Mesh(new THREE.BoxGeometry(0.2, 6, 4), flagMat);
+            flag.position.set(0, 12, 0);
+            group.add(flag);
+
+            group.position.set(100, 0, 0);
+            scene.add(group);
+        }
+
+        function createMagicTower() {
+            // Magic Tower at -X side (X: -90, Z: 0)
+            const group = new THREE.Group();
+
+            const towerMat = new THREE.MeshStandardMaterial({ color: 0x2e1065, roughness: 0.5 });
+            const tower = new THREE.Mesh(new THREE.CylinderGeometry(6, 8, 28, 12), towerMat);
+            tower.position.y = 14;
+            tower.castShadow = true;
+            group.add(tower);
+
+            // Glowing Arcane Orb at Top
+            const orbMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 1 });
+            const orb = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 16), orbMat);
+            orb.position.y = 30;
+            group.add(orb);
+
+            group.position.set(-100, 0, 0);
+            scene.add(group);
+        }
+
+        function createDragonKingShrine() {
+            // Shrine in middle of river (X: 0, Z: 0)
+            const group = new THREE.Group();
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(8, 10, 2, 8), baseMat);
+            base.position.y = 1;
+            group.add(base);
+
+            // Dead Dragon Statue
+            const dragonMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 });
+            const dragonBody = new THREE.Mesh(new THREE.ConeGeometry(3, 10, 6), dragonMat);
+            dragonBody.rotation.z = Math.PI / 2.5;
+            dragonBody.position.y = 2;
+            group.add(dragonBody);
+
+            group.position.set(0, 0, 0);
+            scene.add(group);
+        }
+
+        // --- STREAMING_CHUNK:Spawning NPCs, Enemies, and Resource Nodes... ---
+
+        function spawnWorldEntities() {
+            // 1. Human High King (Ruler Boss) at Human Fortress (+100, 0, 0)
+            createNPC({
+                name: "High King Aurelius",
+                faction: "human",
+                isRuler: true,
+                x: 100, z: -5,
+                color: 0xeab308,
+                hp: 500, maxHp: 500
+            });
+
+            // Human Quest Captain
+            createNPC({
+                name: "Human Captain Vane",
+                faction: "human",
+                isRuler: false,
+                x: 85, z: 15,
+                color: 0x38bdf8,
+                hp: 200, maxHp: 200
+            });
+
+            // 2. Arch-Mage Elder (Ruler Boss) at Magic Tower (-100, 0, 0)
+            createNPC({
+                name: "Arch-Mage Elion",
+                faction: "magic",
+                isRuler: true,
+                x: -100, z: -5,
+                color: 0xa855f7,
+                hp: 500, maxHp: 500
+            });
+
+            // Magic Quest Keeper
+            createNPC({
+                name: "Arcane Keeper Selene",
+                faction: "magic",
+                isRuler: false,
+                x: -85, z: 15,
+                color: 0x06b6d4,
+                hp: 200, maxHp: 200
+            });
+
+            // 3. Spawn Hostile Bandits around Middle Ruins
+            for (let i = 0; i < 6; i++) {
+                spawnEnemy({
+                    name: "Rogue Bandit",
+                    type: "bandit",
+                    x: (Math.random() - 0.5) * 60,
+                    z: (Math.random() - 0.5) * 60 + 40,
+                    hp: 60, maxHp: 60,
+                    damage: 12,
+                    color: 0xd97706
+                });
+            }
+
+            // 4. Resource Nodes (Iron Ingots & Mana Crystals)
+            for (let i = 0; i < 8; i++) {
+                spawnResourceNode("iron", (Math.random() - 0.5) * 160 + 40, (Math.random() - 0.5) * 160);
+                spawnResourceNode("crystal", (Math.random() - 0.5) * 160 - 40, (Math.random() - 0.5) * 160);
+            }
+        }
+
+        function createNPC(cfg) {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: cfg.color });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 2.5, 8), bodyMat);
+            body.position.y = 1.25;
+            body.castShadow = true;
+            group.add(body);
+
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 8), bodyMat);
+            head.position.y = 2.8;
+            group.add(head);
+
+            group.position.set(cfg.x, 0, cfg.z);
+            scene.add(group);
+
+            npcs.push({
+                ...cfg,
+                mesh: group,
+                alive: true
+            });
+        }
+
+        function spawnEnemy(cfg) {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: cfg.color });
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.4, 1.2), mat);
+            body.position.y = 1.2;
+            body.castShadow = true;
+            group.add(body);
+
+            group.position.set(cfg.x, 0, cfg.z);
+            scene.add(group);
+
+            enemies.push({
+                ...cfg,
+                mesh: group,
+                alive: true
+            });
+        }
+
+        function spawnResourceNode(type, x, z) {
+            const color = type === 'iron' ? 0x94a3b8 : 0x06b6d4;
+            const geo = type === 'iron' ? new THREE.DodecahedronGeometry(1.2) : new THREE.OctahedronGeometry(1.4);
+            const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.7 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, 1, z);
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            resourceNodes.push({ type, mesh, harvested: false });
+        }
+
+        function createPlayerMesh() {
+            playerGroup = new THREE.Group();
+
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 2.2, 8), bodyMat);
+            body.position.y = 1.1;
+            body.castShadow = true;
+            playerGroup.add(body);
+
+            // Player Weapon
+            const wMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8 });
+            playerWeapon = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.8, 0.3), wMat);
+            playerWeapon.position.set(0.8, 1.2, 0.5);
+            playerGroup.add(playerWeapon);
+
+            playerGroup.position.set(0, 0, 80); // Spawn near middle shrine
+            scene.add(playerGroup);
+        }
+
+        /* ==========================================================================
+           4. CONTROLS, MOVEMENT & CAMERA LOGIC
+           ========================================================================== */
+
+        function setupInputControls() {
+            window.addEventListener('keydown', (e) => {
+                keys[e.code] = true;
+                if (e.code === 'KeyI') toggleInventoryModal();
+                if (e.code === 'Tab') { e.preventDefault(); toggleQuestModal(); }
+                if (e.code === 'KeyE') handleInteraction();
+                if (e.code === 'KeyQ') castSpell();
+                if (e.code === 'Digit1') usePotion('hp');
+                if (e.code === 'Digit2') usePotion('mp');
+            });
+
+            window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+            // Pointer Lock Mouse look
+            const canvas = document.getElementById('webgl-canvas');
+            canvas.addEventListener('click', () => {
+                if (!isPointerLocked && document.getElementById('charSelectModal').classList.contains('hidden')) {
+                    canvas.requestPointerLock();
+                } else if (isPointerLocked) {
+                    performAttack();
+                }
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                isPointerLocked = document.pointerLockElement === canvas;
+                document.getElementById('crosshair').classList.toggle('hidden', !isPointerLocked);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isPointerLocked) {
+                    playerGroup.rotation.y -= e.movementX * 0.003;
+                }
+            });
+
+            canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                castSpell();
+            });
+        }
+
+        function selectClass(className) {
+            gameState.selectedClass = className;
+            document.querySelectorAll('.class-card').forEach(c => c.classList.remove('border-amber-400', 'bg-slate-900/80'));
+            const card = document.getElementById(`class-${className}`);
+            if (card) card.classList.add('border-amber-400', 'bg-slate-900/80');
+
+            if (className === 'knight') {
+                gameState.maxHp = 150; gameState.hp = 150;
+                gameState.maxMp = 50; gameState.mp = 50;
+                gameState.speed = 0.18; gameState.attackPower = 25;
+            } else if (className === 'spellblade') {
+                gameState.maxHp = 100; gameState.hp = 100;
+                gameState.maxMp = 140; gameState.mp = 140;
+                gameState.speed = 0.22; gameState.attackPower = 40;
+            } else if (className === 'rogue') {
+                gameState.maxHp = 110; gameState.hp = 110;
+                gameState.maxMp = 80; gameState.mp = 80;
+                gameState.speed = 0.26; gameState.attackPower = 35;
+            }
+        }
+
+        function startGame() {
+            document.getElementById('charSelectModal').classList.add('hidden');
+            document.getElementById('gameHUD').classList.remove('hidden');
+            updateHUD();
+            init3DWorld();
+            requestAnimationFrame(gameLoop);
+            SoundEngine.playHorn();
+        }
+
+        // --- STREAMING_CHUNK:Implementing game loop, combat physics, and AI behavior... ---
+
+        function gameLoop() {
+            if (gameState.gameEnded) return;
+
+            // Player Movement
+            if (isPointerLocked) {
+                const moveSpeed = gameState.speed;
+                if (keys['KeyW'] || keys['ArrowUp']) playerGroup.translateZ(-moveSpeed);
+                if (keys['KeyS'] || keys['ArrowDown']) playerGroup.translateZ(moveSpeed);
+                if (keys['KeyA'] || keys['ArrowLeft']) playerGroup.translateX(-moveSpeed);
+                if (keys['KeyD'] || keys['ArrowRight']) playerGroup.translateX(moveSpeed);
+
+                // Boundary bounds
+                playerGroup.position.x = Math.max(-140, Math.min(140, playerGroup.position.x));
+                playerGroup.position.z = Math.max(-140, Math.min(140, playerGroup.position.z));
+            }
+
+            // Third-person camera follow
+            const camOffset = new THREE.Vector3(0, 5, 10).applyQuaternion(playerGroup.quaternion);
+            camera.position.copy(playerGroup.position).add(camOffset);
+            camera.lookAt(playerGroup.position.clone().add(new THREE.Vector3(0, 2, 0)));
+
+            // Update Projectiles
+            updateProjectiles();
+
+            // Update NPC & Enemy AI Behavior
+            updateAIBehavior();
+
+            // Update Minimap
+            updateMinimap();
+
+            // Render 3D Frame
+            renderer.render(scene, camera);
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* ==========================================================================
+           5. COMBAT, SPELLS & INTERACTION SYSTEM
+           ========================================================================== */
+
+        function performAttack() {
+            SoundEngine.playSwordSwing();
+
+            // Weapon swing animation
+            playerWeapon.rotation.x = -Math.PI / 3;
+            setTimeout(() => playerWeapon.rotation.x = 0, 150);
+
+            // Check hit range
+            const pPos = playerGroup.position;
+
+            // Check Enemy hits
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+                if (pPos.distanceTo(enemy.mesh.position) < 3.5) {
+                    damageEnemy(enemy, gameState.attackPower);
+                }
+            });
+
+            // Check NPC Hostile hits
+            npcs.forEach(npc => {
+                if (!npc.alive) return;
+                const isHostile = (npc.faction === 'human' && gameState.repHuman < 0) ||
+                                  (npc.faction === 'magic' && gameState.repMagic < 0);
+                if (isHostile && pPos.distanceTo(npc.mesh.position) < 3.5) {
+                    damageNPC(npc, gameState.attackPower);
+                }
+            });
+        }
+
+        function castSpell() {
+            if (gameState.mp < 15) {
+                showToast("Not enough Mana!");
+                return;
+            }
+            gameState.mp -= 15;
+            updateHUD();
+            SoundEngine.playSpellCast();
+
+            // Spawn Projectile
+            const pGeo = new THREE.SphereGeometry(0.5, 8, 8);
+            const pMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 1 });
+            const mesh = new THREE.Mesh(pGeo, pMat);
+
+            const pPos = playerGroup.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+            mesh.position.copy(pPos);
+
+            const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(playerGroup.quaternion);
+            projectiles.push({ mesh, dir, speed: 0.8, life: 60 });
+            scene.add(mesh);
+        }
+
+        function updateProjectiles() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.mesh.position.addScaledVector(p.dir, p.speed);
+                p.life--;
+
+                // Hit checks
+                enemies.forEach(enemy => {
+                    if (enemy.alive && p.mesh.position.distanceTo(enemy.mesh.position) < 2) {
+                        damageEnemy(enemy, gameState.attackPower * 1.5);
+                        p.life = 0;
+                    }
+                });
+
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        function damageEnemy(enemy, dmg) {
+            enemy.hp -= dmg;
+            SoundEngine.playBeep(200, 'square', 0.1);
+
+            if (enemy.hp <= 0) {
+                enemy.alive = false;
+                scene.remove(enemy.mesh);
+                gameState.exp += 30;
+                gameState.gold += 25;
+                showToast(`Defeated ${enemy.name}! +30 XP +25 Gold`);
+
+                // Progress Quests
+                gameState.quests.forEach(q => {
+                    if (q.id === 'human_quest_1' && !q.completed) {
+                        q.currentCount++;
+                        if (q.currentCount >= q.targetCount) completeQuest(q);
+                    }
+                });
+
+                updateHUD();
+            }
+        }
+
+        function damageNPC(npc, dmg) {
+            npc.hp -= dmg;
+            SoundEngine.playBeep(150, 'sawtooth', 0.1);
+
+            if (npc.hp <= 0) {
+                npc.alive = false;
+                scene.remove(npc.mesh);
+
+                if (npc.isRuler) {
+                    // RULER DEFEATED — WIN / LOSS CONDITION TRIGGERED!
+                    triggerRulerDeath(npc);
+                } else {
+                    showToast(`Killed ${npc.name}!`);
+                }
+            }
+        }
+
+        function triggerRulerDeath(ruler) {
+            gameState.gameEnded = true;
+            SoundEngine.playHorn();
+
+            const modal = document.getElementById('gameOverModal');
+            const title = document.getElementById('endGameTitle');
+            const desc = document.getElementById('endGameDesc');
+
+            if (ruler.faction === 'human') {
+                title.innerText = "MAGIC REALM VICTORY!";
+                desc.innerText = "High King Aurelius has fallen! The Arcane Arch-Mage Elder now claims dominance over all Dragon Wars realms.";
+            } else {
+                title.innerText = "HUMAN REALM VICTORY!";
+                desc.innerText = "Arch-Mage Elion was slain! High King Aurelius and the Human Steel Armies have conquered the land.";
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        // --- STREAMING_CHUNK:AI Behaviors, Interactions, and Quest Handlers... ---
+
+        function updateAIBehavior() {
+            const pPos = playerGroup.position;
+
+            // Enemies aggro towards player
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+                const dist = pPos.distanceTo(enemy.mesh.position);
+                if (dist < 18) {
+                    enemy.mesh.lookAt(pPos.x, enemy.mesh.position.y, pPos.z);
+                    enemy.mesh.translateZ(0.06);
+
+                    // Attack Player
+                    if (dist < 2) {
+                        damagePlayer(enemy.damage * 0.05);
+                    }
+                }
+            });
+
+            // NPCs aggro if player is Hostile (Rep < 0)
+            npcs.forEach(npc => {
+                if (!npc.alive) return;
+                const isHostile = (npc.faction === 'human' && gameState.repHuman < 0) ||
+                                  (npc.faction === 'magic' && gameState.repMagic < 0);
+
+                const dist = pPos.distanceTo(npc.mesh.position);
+                if (isHostile && dist < 16) {
+                    npc.mesh.lookAt(pPos.x, npc.mesh.position.y, pPos.z);
+                    npc.mesh.translateZ(0.05);
+                    if (dist < 2.2) {
+                        damagePlayer(8 * 0.05);
+                    }
+                }
+            });
+        }
+
+        function damagePlayer(dmg) {
+            gameState.hp -= dmg;
+            if (gameState.hp <= 0) {
+                gameState.hp = 0;
+                gameState.gameEnded = true;
+                showToast("You were slain in battle!");
+                setTimeout(() => location.reload(), 2000);
+            }
+            updateHUD();
+        }
+
+        function handleInteraction() {
+            const pPos = playerGroup.position;
+
+            // 1. Resource Node Gathering
+            resourceNodes.forEach(node => {
+                if (!node.harvested && pPos.distanceTo(node.mesh.position) < 3.5) {
+                    node.harvested = true;
+                    scene.remove(node.mesh);
+                    if (node.type === 'iron') {
+                        gameState.inventory.ironIngot++;
+                        showToast("Harvested Iron Ingot!");
+                    } else {
+                        gameState.inventory.manaCrystal++;
+                        showToast("Harvested Glowing Mana Crystal!");
+                        // Progress Magic quest
+                        gameState.quests.forEach(q => {
+                            if (q.id === 'magic_quest_1' && !q.completed) {
+                                q.currentCount++;
+                                if (q.currentCount >= q.targetCount) completeQuest(q);
+                            }
+                        });
+                    }
+                }
+            });
+
+            // 2. Dialogue Interaction with NPCs
+            npcs.forEach(npc => {
+                if (npc.alive && pPos.distanceTo(npc.mesh.position) < 4) {
+                    openDialogue(npc);
+                }
+            });
+        }
+
+        function openDialogue(npc) {
+            const isHostile = (npc.faction === 'human' && gameState.repHuman < 0) ||
+                              (npc.faction === 'magic' && gameState.repMagic < 0);
+
+            const modal = document.getElementById('dialogueModal');
+            document.getElementById('npcName').innerText = npc.name;
+            document.getElementById('npcFactionTag').innerText = `${npc.faction.toUpperCase()} FACTION ${npc.isRuler ? 'RULER' : 'OFFICER'}`;
+
+            const textEl = document.getElementById('npcDialogueText');
+            const optsEl = document.getElementById('dialogueOptions');
+            optsEl.innerHTML = '';
+
+            if (isHostile) {
+                textEl.innerText = `"Back off, outcast! You have -100 Reputation with the ${npc.faction.toUpperCase()} Realm! Prove your loyalty by completing faction quests before we treat you as an ally."`;
+                optsEl.innerHTML = `<button onclick="closeDialogue()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700">Retreat</button>`;
+            } else {
+                textEl.innerText = `"Welcome, trusted ally! The Dragon King's death has plunged our world into war. Will you help us slay our enemies?"`;
+                optsEl.innerHTML = `
+                    <button onclick="closeDialogue();" class="px-4 py-2 rounded-xl bg-amber-500 text-xs font-bold text-slate-950 hover:bg-amber-400">Accept War Duty</button>
+                    <button onclick="closeDialogue();" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700">Goodbye</button>
+                `;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeDialogue() {
+            document.getElementById('dialogueModal').classList.add('hidden');
+        }
+
+        function completeQuest(quest) {
+            quest.completed = true;
+            SoundEngine.playBeep(880, 'sine', 0.2);
+
+            if (quest.faction === 'human') {
+                gameState.repHuman = Math.min(100, gameState.repHuman + quest.rewardRep);
+                gameState.repMagic = Math.max(-100, gameState.repMagic - quest.rewardRep);
+            } else {
+                gameState.repMagic = Math.min(100, gameState.repMagic + quest.rewardRep);
+                gameState.repHuman = Math.max(-100, gameState.repHuman - quest.rewardRep);
+            }
+
+            gameState.gold += quest.rewardGold;
+            showToast(`QUEST COMPLETE: ${quest.title}! +${quest.rewardRep} Rep +${quest.rewardGold} Gold`);
+            updateHUD();
+        }
+
+        function usePotion(type) {
+            if (type === 'hp' && gameState.inventory.hpPotion > 0) {
+                gameState.inventory.hpPotion--;
+                gameState.hp = Math.min(gameState.maxHp, gameState.hp + 50);
+                showToast("Used Health Potion (+50 HP)");
+            } else if (type === 'mp' && gameState.inventory.mpPotion > 0) {
+                gameState.inventory.mpPotion--;
+                gameState.mp = Math.min(gameState.maxMp, gameState.mp + 40);
+                showToast("Used Mana Potion (+40 MP)");
+            }
+            updateHUD();
+        }
+
+        /* ==========================================================================
+           6. UI UPDATE HELPERS & MINIMAP RADAR
+           ========================================================================== */
+
+        function updateHUD() {
+            document.getElementById('hudClassName').innerText = gameState.selectedClass.toUpperCase();
+            document.getElementById('hudLevel').innerText = `Lvl ${gameState.level}`;
+
+            document.getElementById('hudHPText').innerText = `${Math.round(gameState.hp)} / ${gameState.maxHp}`;
+            document.getElementById('hudHPFill').style.width = `${(gameState.hp / gameState.maxHp) * 100}%`;
+
+            document.getElementById('hudMPText').innerText = `${Math.round(gameState.mp)} / ${gameState.maxMp}`;
+            document.getElementById('hudMPFill').style.width = `${(gameState.mp / gameState.maxMp) * 100}%`;
+
+            document.getElementById('hudGold').innerText = `${gameState.gold} Gold`;
+            document.getElementById('hudEXP').innerText = `${gameState.exp} / ${gameState.maxExp} XP`;
+
+            document.getElementById('hpPotionCount').innerText = gameState.inventory.hpPotion;
+            document.getElementById('mpPotionCount').innerText = gameState.inventory.mpPotion;
+
+            // Rep Standings
+            const hFill = document.getElementById('repHumanFill');
+            const hStatus = document.getElementById('repHumanStatus');
+            const hPercent = ((gameState.repHuman + 100) / 200) * 100;
+            hFill.style.width = `${hPercent}%`;
+            hStatus.innerText = gameState.repHuman >= 0 ? `ALLIED (+${gameState.repHuman})` : `HOSTILE (${gameState.repHuman})`;
+            hStatus.className = gameState.repHuman >= 0 ? 'text-emerald-400 font-black' : 'text-red-400 font-black';
+
+            const mFill = document.getElementById('repMagicFill');
+            const mStatus = document.getElementById('repMagicStatus');
+            const mPercent = ((gameState.repMagic + 100) / 200) * 100;
+            mFill.style.width = `${mPercent}%`;
+            mStatus.innerText = gameState.repMagic >= 0 ? `ALLIED (+${gameState.repMagic})` : `HOSTILE (${gameState.repMagic})`;
+            mStatus.className = gameState.repMagic >= 0 ? 'text-emerald-400 font-black' : 'text-red-400 font-black';
+
+            // Sync Modals
+            document.getElementById('modalHumanRep').innerText = `Reputation: ${gameState.repHuman} (${gameState.repHuman >= 0 ? 'Friendly' : 'Hostile'})`;
+            document.getElementById('modalMagicRep').innerText = `Reputation: ${gameState.repMagic} (${gameState.repMagic >= 0 ? 'Friendly' : 'Hostile'})`;
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('notificationToast');
+            toast.innerText = msg;
+            toast.classList.remove('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.classList.add('opacity-0', 'translate-y-2'), 2500);
+        }
+
+        function updateMinimap() {
+            const canvas = document.getElementById('minimapCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, 120, 120);
+
+            const scale = 120 / 300;
+            const cx = 60, cy = 60;
+
+            // Draw Player
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(cx + playerGroup.position.x * scale, cy + playerGroup.position.z * scale, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw NPCs
+            npcs.forEach(npc => {
+                if (!npc.alive) return;
+                ctx.fillStyle = npc.faction === 'human' ? '#eab308' : '#a855f7';
+                ctx.fillRect(cx + npc.mesh.position.x * scale - 2, cy + npc.mesh.position.z * scale - 2, 4, 4);
+            });
+
+            // Draw Enemies
+            enemies.forEach(e => {
+                if (!e.alive) return;
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(cx + e.mesh.position.x * scale, cy + e.mesh.position.z * scale, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function toggleInventoryModal() {
+            const m = document.getElementById('inventoryModal');
+            m.classList.toggle('hidden');
+            if (!m.classList.contains('hidden')) renderInventory();
+        }
+
+        function renderInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            grid.innerHTML = `
+                <div onclick="usePotion('hp')" class="bg-slate-900 border border-slate-700 p-3 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-red-500">
+                    <i class="fa-solid fa-flask text-red-500 text-xl"></i>
+                    <span class="text-xs font-bold text-white mt-1">HP Potion</span>
+                    <span class="text-[10px] text-slate-400">x${gameState.inventory.hpPotion}</span>
+                </div>
+                <div onclick="usePotion('mp')" class="bg-slate-900 border border-slate-700 p-3 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan-500">
+                    <i class="fa-solid fa-flask text-cyan-400 text-xl"></i>
+                    <span class="text-xs font-bold text-white mt-1">MP Potion</span>
+                    <span class="text-[10px] text-slate-400">x${gameState.inventory.mpPotion}</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-700 p-3 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-cube text-slate-400 text-xl"></i>
+                    <span class="text-xs font-bold text-white mt-1">Iron Ingot</span>
+                    <span class="text-[10px] text-slate-400">x${gameState.inventory.ironIngot}</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-700 p-3 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-gem text-cyan-300 text-xl"></i>
+                    <span class="text-xs font-bold text-white mt-1">Mana Crystal</span>
+                    <span class="text-[10px] text-slate-400">x${gameState.inventory.manaCrystal}</span>
+                </div>
+            `;
+        }
+
+        function toggleQuestModal() {
+            const m = document.getElementById('questModal');
+            m.classList.toggle('hidden');
+            if (!m.classList.contains('hidden')) renderQuests();
+        }
+
+        function renderQuests() {
+            const list = document.getElementById('questList');
+            list.innerHTML = '';
+            gameState.quests.forEach(q => {
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-2xl border ${q.completed ? 'bg-emerald-950/40 border-emerald-500/50' : 'bg-slate-900/80 border-slate-700'} flex justify-between items-center`;
+                card.innerHTML = `
+                    <div>
+                        <div class="text-xs font-bold ${q.faction === 'human' ? 'text-amber-400' : 'text-cyan-400'}">${q.title}</div>
+                        <div class="text-[11px] text-slate-300 mt-0.5">${q.desc}</div>
+                        <div class="text-[10px] text-slate-400 mt-1">Progress: ${q.currentCount} / ${q.targetCount}</div>
+                    </div>
+                    <div>
+                        ${q.completed ? `<span class="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">COMPLETED</span>` : `<span class="px-2 py-1 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold">ACTIVE</span>`}
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function onWindowResize() {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }
+    </script>
+</body>
+</html>
